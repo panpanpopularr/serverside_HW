@@ -77,4 +77,72 @@ app.listen(port, () => {
     console.log(`- GET http://localhost:${port}/products/1`);
     console.log(`- GET http://localhost:${port}/products/search/เสื้อ`);
 });
-    
+
+app.post('/products', async (req, res) => {
+    const { name, price, discount, review_count, image_url } = req.body;
+    try {
+        const [result] = await pool.query(
+            'INSERT INTO products (name, price, discount, review_count, image_url) VALUES (?, ?, ?, ?, ?)',
+            [name, price, discount, review_count, image_url]
+        );
+        res.status(201).json({ id: result.insertId, name, price, discount, review_count, image_url });
+    } catch (error) {
+        console.error('Error creating product:', error);
+        res.status(500).json({ message: 'Error creating product', error: error.message });
+    }
+});
+
+app.put('/products/:id', async (req, res) => {
+    const { name, price, discount, review_count, image_url } = req.body;
+    const id = req.params.id;
+    try {
+        const [result] = await pool.query(
+            'UPDATE products SET name = ?, price = ?, discount = ?, review_count = ?, image_url = ? WHERE id = ? AND deleted_at IS NULL',
+            [name, price, discount, review_count, image_url, id]
+        );
+        if (result.affectedRows > 0) {
+            res.json({ message: 'Product updated successfully' });
+        } else {
+            res.status(404).json({ message: 'Product not found or already deleted' });
+        }
+    } catch (error) {
+        console.error(`Error updating product ${id}:`, error);
+        res.status(500).json({ message: 'Error updating product', error: error.message });
+    }
+});
+
+app.delete('/products/:id', async (req, res) => {
+    const id = req.params.id;
+    try {
+        const [result] = await pool.query(
+            'UPDATE products SET deleted_at = NOW() WHERE id = ? AND deleted_at IS NULL',
+            [id]
+        );
+        if (result.affectedRows > 0) {
+            res.json({ message: 'Product soft-deleted successfully' });
+        } else {
+            res.status(404).json({ message: 'Product not found or already deleted' });
+        }
+    } catch (error) {
+        console.error(`Error soft-deleting product ${id}:`, error);
+        res.status(500).json({ message: 'Error soft-deleting product', error: error.message });
+    }
+});
+
+app.patch('/products/:id/restore', async (req, res) => {
+    const id = req.params.id;
+    try {
+        const [result] = await pool.query(
+            'UPDATE products SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL',
+            [id]
+        );
+        if (result.affectedRows > 0) {
+            res.json({ message: 'Product restored successfully' });
+        } else {
+            res.status(404).json({ message: 'Product not found or not deleted' });
+        }
+    } catch (error) {
+        console.error(`Error restoring product ${id}:`, error);
+        res.status(500).json({ message: 'Error restoring product', error: error.message });
+    }
+});
